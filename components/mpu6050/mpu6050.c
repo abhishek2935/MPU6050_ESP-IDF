@@ -1,13 +1,64 @@
-#include <stdio.h>
 #include "mpu6050.h"
 
 #include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/queue.h"
 
-#include "driver/i2c_master.h"
+#define SDA 6
+#define SCL 7 
+#define I2C_PORT I2C_NUM_0
 
-void func(void)
+
+static i2c_master_bus_handle_t bus_handle ; 
+static i2c_master_dev_handle_t mpu;
+void mpu6050_i2c_init()
 {
-    
+    i2c_master_bus_config_t bus_config = {
+        .i2c_port = I2C_PORT,
+        .sda_io_num = SDA , 
+        .scl_io_num = SCL , 
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .glitch_ignore_cnt = 7 , 
+        .flags.enable_internal_pullup = true 
+    };
+
+
+    i2c_new_master_bus(&bus_config , &bus_handle);
+
+    i2c_device_config_t dev_config = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7 ,
+        .device_address = MPU_ADDR,
+        .scl_speed_hz = 400000  // can go to 400k 
+    };
+
+    i2c_master_bus_add_device(bus_handle,&dev_config,&mpu);
+}
+
+void mpu_write(uint8_t reg , uint8_t data)
+{
+    uint8_t buf[2] = {reg , data} ; 
+
+    i2c_master_transmit(
+        mpu,
+        buf,
+        sizeof(buf),
+        pdMS_TO_TICKS(1000)
+    );
+}
+
+
+void mpu_read(uint8_t reg , uint8_t *data , size_t len)
+{
+    i2c_master_transmit_receive(
+        mpu,
+        &reg,
+        1,
+        data,
+        len,
+        pdMS_TO_TICKS(1000)
+    );
+}
+
+
+void mpu_init()
+{
+    mpu_write(PW_MGMT,0x00); // sensor wake up
 }

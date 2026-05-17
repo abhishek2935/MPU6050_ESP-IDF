@@ -8,18 +8,14 @@ static QueueHandle_t imu_queue ;
 // Tasks
 // ---------
 
-
 void task_mpu (void *param)
 {
 
     imu_struct_t imu_packet ; 
 
     uint8_t data[14];
-    uint32_t prev_ms = xTaskGetTickCount() * portTICK_PERIOD_MS ; 
-    
-    float angle_x = 0.0f;
-    float angle_y = 0.0f;
-    float angle_z = 0.0f;
+    TickType_t lastTick = xTaskGetTickCount() ; 
+
     
     for(;;)
     {
@@ -36,9 +32,9 @@ void task_mpu (void *param)
         imu_packet.timeStamp = xTaskGetTickCount() * portTICK_PERIOD_MS ; // current time
  
         xQueueSend(imu_queue , &imu_packet , portMAX_DELAY) ; 
-        vTaskDelay(pdMS_TO_TICKS(10));
+        
+        vTaskDelayUntil(&lastTick , pdMS_TO_TICKS(10)) ; 
     }
-
 }
 
 void task_processing(void * param)
@@ -76,7 +72,7 @@ void task_processing(void * param)
             angle_y +=  gy * (dt); 
             angle_z +=  gz * (dt) ; 
 
-            printf("%ld , %f , %f , %f , %f , %f , %f \n" , imu_packet.timeStamp , angle_x , angle_y , angle_z , roll_axl , pitch_axl , 0.0f) ; 
+            printf(">Time:%ld, X:%f, Y:%f , Z:%f , Roll:%f , Pitch:%f, zero:%f \r\n" , imu_packet.timeStamp , angle_x , angle_y , angle_z , roll_axl , pitch_axl , 0.0f) ; 
         }
     }
 

@@ -1,8 +1,13 @@
 #include <stdio.h>
 #include "processing.h"
+#include "LCD.h"
 
+#include "freertos/queue.h"
 
 static QueueHandle_t imu_queue ; 
+QueueHandle_t disp_queue ; 
+
+ 
 
 // ---------
 // Tasks
@@ -16,7 +21,6 @@ void task_mpu (void *param)
     uint8_t data[14];
     TickType_t lastTick = xTaskGetTickCount() ; 
 
-    
     for(;;)
     {
         mpu_read(AXL,data,14);
@@ -34,13 +38,15 @@ void task_mpu (void *param)
         xQueueSend(imu_queue , &imu_packet , portMAX_DELAY) ; 
         
         vTaskDelayUntil(&lastTick , pdMS_TO_TICKS(10)) ; 
+        
     }
 }
 
 void task_processing(void * param)
 {
     imu_struct_t imu_packet ; 
-
+    display_struct_t disp_packet ;
+    
     uint32_t prev_ms = 0 ; 
 
     float angle_x = 0 , angle_y = 0 , angle_z = 0 ; 
@@ -67,11 +73,16 @@ void task_processing(void * param)
             float roll_axl = atan2(ay ,az) * (180/3.141592653f) ; 
             float pitch_axl = atan2(-ax , sqrt((ay)*(ay) + (az)*(az)))*(180/3.141592653f);
 
+            disp_packet.roll_axl = roll_axl ; 
+            disp_packet.pitch_axl = pitch_axl ; 
+            disp_packet.timeStamp = imu_packet.timeStamp ; 
+
             // gyro - deg
             angle_x +=  gx * (dt) ; 
             angle_y +=  gy * (dt); 
             angle_z +=  gz * (dt) ; 
 
+            xQueueSend(disp_queue,&disp_packet,portMAX_DELAY) ; 
             printf(">Time:%ld, X:%f, Y:%f , Z:%f , Roll:%f , Pitch:%f, zero:%f \r\n" , imu_packet.timeStamp , angle_x , angle_y , angle_z , roll_axl , pitch_axl , 0.0f) ; 
         }
     }
@@ -81,21 +92,22 @@ void task_processing(void * param)
 void processing_init()
 {
     imu_queue = xQueueCreate(10 , sizeof(imu_struct_t)); 
+    disp_queue = xQueueCreate(10,sizeof(display_struct_t)) ;
+
 
     if(imu_queue == NULL) 
     {
-        printf("empty queue... Failed\n") ; 
+        printf("empty imu queue... Failed\n") ; 
         return ; 
     }
 
-    xTaskCreate(
-        task_mpu , 
-        "task_mpu",
-        5000,
-        NULL,
-        1,
-        NULL
-    );
+    if(disp_queue == NULL)
+    {
+        printf("disp empty\n");
+        return ; 
+    }
 
-    xTaskCreate(task_processing , "processing" , 5000 , NULL , 1 , NULL) ; 
+    xTaskCreate(task_mpu ,"task_mpu", 5000, NULL, 1, NULL);
+    xTaskCreate(task_processing , "processing" , 5000 , NULL , 1 , NULL) ;
+    xTaskCreate(task_lcd, "task_lcd" , 5000, NULL , 1 , NULL); 
 }

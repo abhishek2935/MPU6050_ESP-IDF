@@ -1,4 +1,5 @@
 #include "mpu6050.h"
+#include "i2c_bus.h"
 
 #include "freertos/FreeRTOS.h"
 
@@ -7,21 +8,10 @@
 #define I2C_PORT I2C_NUM_0
 
 
-static i2c_master_bus_handle_t bus_handle ; 
 static i2c_master_dev_handle_t mpu;
 void mpu6050_i2c_init()
 {
-    i2c_master_bus_config_t bus_config = {
-        .i2c_port = I2C_PORT,
-        .sda_io_num = SDA , 
-        .scl_io_num = SCL , 
-        .clk_source = I2C_CLK_SRC_DEFAULT,
-        .glitch_ignore_cnt = 7 , 
-        .flags.enable_internal_pullup = true 
-    };
-
-
-    i2c_new_master_bus(&bus_config , &bus_handle);
+    i2c_master_bus_handle_t bus_handle = get_bus_handle() ; 
 
     i2c_device_config_t dev_config = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7 ,
